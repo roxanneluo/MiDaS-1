@@ -163,7 +163,7 @@ def resize_depth(depth, width, height):
 
     return depth_resized
 
-def write_depth(path, depth, bits=1):
+def write_depth(path, depth, bits=1, color=None):
     """Write depth map to pfm and png file.
 
     Args:
@@ -181,6 +181,10 @@ def write_depth(path, depth, bits=1):
         out = max_val * (depth - depth_min) / (depth_max - depth_min)
     else:
         out = 0
+
+    if color is not None:
+        color = color * max_val
+        out = np.hstack((color, np.tile(out[..., None], (1,1,3))))
 
     if bits == 1:
         cv2.imwrite(path + ".png", out.astype("uint8"))

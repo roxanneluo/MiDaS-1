@@ -14,7 +14,7 @@ from models.midas_net import MidasNet
 from models.transforms import Resize, NormalizeImage, PrepareForNet
 
 
-def run(img_paths, depth_paths, model_path):
+def run(img_paths, depth_paths, model_path, vis_input=False):
     """Run MonoDepthNN to compute depth maps.
 
     Args:
@@ -56,35 +56,38 @@ def run(img_paths, depth_paths, model_path):
     print("start processing {} images".format(num_images))
 
     for ind, (img_name, depth_name) in enumerate(zip(img_paths, depth_paths)):
+        try:
 
-        print("  processing {} ({}/{})".format(img_name, ind + 1, num_images))
+            print("  processing {} ({}/{})".format(img_name, ind + 1, num_images))
 
-        # input
+            # input
 
-        img = utils.read_image(img_name)
-        img_input = transform({"image": img})["image"]
+            img = utils.read_image(img_name)
+            img_input = transform({"image": img})["image"]
 
-        # compute
-        with torch.no_grad():
-            sample = torch.from_numpy(img_input).to(device).unsqueeze(0)
-            prediction = model.forward(sample)
-            prediction = (
-                torch.nn.functional.interpolate(
-                    prediction.unsqueeze(1),
-                    size=img.shape[:2],
-                    mode="bicubic",
-                    align_corners=False,
+            # compute
+            with torch.no_grad():
+                sample = torch.from_numpy(img_input).to(device).unsqueeze(0)
+                prediction = model.forward(sample)
+                prediction = (
+                    torch.nn.functional.interpolate(
+                        prediction.unsqueeze(1),
+                        size=img.shape[:2],
+                        mode="bicubic",
+                        align_corners=False,
+                    )
+                    .squeeze()
+                    .cpu()
+                    .numpy()
                 )
-                .squeeze()
-                .cpu()
-                .numpy()
-            )
 
-        # create output folder
-        os.makedirs(os.path.dirname(depth_name), exist_ok=True)
+            # create output folder
+            os.makedirs(os.path.dirname(depth_name), exist_ok=True)
 
-        # output
-        utils.write_depth(depth_name, prediction, bits=2)
+            # output
+            utils.write_depth(depth_name, prediction, bits=1, color=img if vis_input else None)
+        except Exception as e:
+            print(e)
 
     print("finished")
 
@@ -108,7 +111,7 @@ def main(args):
     torch.backends.cudnn.benchmark = True
 
     # compute depth maps
-    run(in_paths, out_paths, args.model_path)
+    run(in_paths, out_paths, args.model_path, vis_input=args.vis_input)
 
     return 0
 
@@ -118,6 +121,7 @@ def parse_args():
     parser.add_argument('--in_format', help="input filename format")
     parser.add_argument('--out_format', help="no extension is needed. e.g., out_dir/{}")
     parser.add_argument('--model_path', default='model.pt')
+    parser.add_argument('--vis_input', action="store_true", help="visualize input image and disparity side-by-side")
     return parser.parse_args()
 
 
