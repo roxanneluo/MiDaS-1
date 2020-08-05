@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from torchvision.models.resnet import ResNet, Bottleneck
+from utils.url_helpers import get_model_from_url
 
 
 def _make_encoder(features, use_pretrained):
